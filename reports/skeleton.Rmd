@@ -1,0 +1,112 @@
+---
+output: 
+  pdf_document:
+    citation_package: natbib
+    keep_tex: true
+    fig_caption: true
+    latex_engine: pdflatex
+    template: template.tex
+    number_sections: false
+title: "Estimated parameters for Schistosomiasis in Sub-saharan Africa"
+# thanks: "**Corresponding author**: c.fronterr@lancaster.ac.uk."
+# author:
+#   name: Claudio Fronterre, Luigi Sedda
+#   affiliation: CHICAS, Lancaster University
+# abstract: "This is my abstract"
+# keywords: "keyword1, keyword2, Keyword3"
+date: "`r format(Sys.time(), '%B %d, %Y')`"
+geometry: margin=1in
+fontfamily: mathpazo
+fontsize: 11pt
+header-includes:
+- \usepackage[english]{babel}
+- \usepackage{booktabs}
+- \usepackage{longtable}
+- \usepackage{array}
+- \usepackage{multirow}
+- \usepackage[table]{xcolor}
+- \usepackage{wrapfig}
+- \usepackage{float}
+- \usepackage{colortbl}
+- \usepackage{pdflscape}
+- \usepackage{tabu}
+- \usepackage{threeparttable}
+- \usepackage{threeparttablex}
+- \usepackage[normalem]{ulem}
+- \usepackage{makecell}
+#spacing: double
+bibliography: biblio.bib
+biblio-style: apalike
+endnote: no
+editor_options: 
+  chunk_output_type: console
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = F, cache = F, warning = F, message = F)
+library(ggplot2)
+library(dplyr)
+source("R/functions.R")
+```
+
+# Data processing
+
+ESPEN data was checked for the presence of duplicated locations. Only locations 
+replicated over time where found and, for each of these entries, the most recent
+survey was retained. All the countries with less than 50 surveys were excluded
+from modelling.
+
+# Modelling framework
+
+We fit a binomial geostatistical model to Schistosomiasis data for each country 
+both for Haematobium and for Mansoni. The number of individuals, $y_i$, tested positive for Schistosomiasis out of the number of people examined $n_i$ at each location $x_i$ can be considered as the realisation of a Binomial random variable $Y_i \sim \text{Binom}(n_i, p(x_i))$, with  $p(x_i)$ modelled as: 
+$$\log\left\{\frac{p(x_i)}{1 - p(x_i)}\right\}=\mu+S(x_i) + Z_i$$
+where $S(x)$ is a zero mean Gaussian process with variance $\sigma^2$ and an exponential correlation function given by $\rho(u;\phi)=\exp\{-u/\phi\}$ where $\phi > 0$ is a scale parameter that controls the extent of the spatial correlation and $u$ is the distance between two sampling locations. Moreover, $Z_i$ is a set of independent zero-mean Gaussian variables with mean $0$ and variance $\tau^2$. 
+
+# Results
+
+\autoref{tab:haema} and \autoref{tab:mansoni} report the estimated parameters obtained by fitting a binomial geostatistical model to Haematobium and Mansoni pre-intervention data
+respectively. In \autoref{fig:plots} we compare the distribution of the estimated model parameteres for the two species.
+
+```{r tab_haema}
+tab_haema <- readr::read_csv("output/models_fitted/haema/fitted_parameters.csv") 
+
+knitr::kable(tab_haema, digits = 3, row.names = F,
+             col.names = c("Country", "n", "$\\hat{\\mu}$", "$\\hat{\\sigma}^2$",
+                           "$\\hat{\\phi}$", "$\\hat{\\tau}^2$"), 
+             escape = F, align = "lcccc",
+             caption = "\\label{tab:haema} Monte Carlo maximum likelihood 
+                        estimates for the model fitted to Haematobium data.",
+             )
+```
+
+```{r tab_masoni}
+tab_mansoni <- readr::read_csv("output/models_fitted/mansoni/fitted_parameters.csv") 
+
+knitr::kable(tab_mansoni, digits = 3, row.names = F,
+             col.names = c("Country", "n", "$\\hat{\\mu}$", "$\\hat{\\sigma}^2$",
+                           "$\\hat{\\phi}$", "$\\hat{\\tau}^2$"), 
+             escape = F, align = "lcccc",
+             caption = "\\label{tab:mansoni} Monte Carlo maximum likelihood 
+                        estimates for the model fitted to Mansoni data.",
+             )
+```
+
+```{r plots, fig.align='center', out.width="100%", fig.cap="Distribution of parameters estimates for both species."}
+tab_haema$specie <- "Haematobium"
+tab_mansoni$specie <- "Mansoni"
+
+parameters <- rbind(tab_haema, tab_mansoni)
+
+parameters %>% 
+  select(-country, -n) %>% 
+  tidyr::gather(key = "parameter", value = "estimate", -specie) %>% 
+  ggplot(aes(x = estimate, fill = specie)) +
+  geom_histogram(position = position_identity(), alpha = .7, bins = 24) +
+  facet_wrap(~ parameter, scales = "free", labeller = label_parsed) +
+  scale_fill_brewer(type = "qual", palette = 6) +
+  labs(x = "Estimated value", fill = "Specie", y = "") + 
+  theme_bw() +
+  theme(legend.position = "top")
+```
+
